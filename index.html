@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meridian Point Lookup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Element colours */
+  --fire:   #e8442a; --fire-dim:   rgba(232,68,42,.18); --fire-glow:   rgba(232,68,42,.55);
+  --wood:   #3ab86a; --wood-dim:   rgba(58,184,106,.16); --wood-glow:  rgba(58,184,106,.50);
+  --metal:  #a8cce8; --metal-dim:  rgba(168,204,232,.14); --metal-glow: rgba(168,204,232,.45);
+  --water:  #2a6fdc; --water-dim:  rgba(42,111,220,.18); --water-glow:  rgba(42,111,220,.55);
+  --earth:  #d4920a; --earth-dim:  rgba(212,146,10,.18); --earth-glow:  rgba(212,146,10,.50);
+  /* Core palette */
+  --ink:    #09111f;
+  --paper:  #f4ede0;
+  --warm0:  #fdf8f0;
+  --warm1:  #ede3d0;
+  --warm2:  #c8b89a;
+  --warm3:  #8a7660;
+  --warm4:  #5a4e3c;
+  --warm5:  #2e2418;
+  --acc:    #b84c28;    /* vermillion accent */
+  --acc2:   #1a4f8c;    /* indigo accent */
+  --border: rgba(90,60,30,.20);
+  --border2:rgba(90,60,30,.10);
+  --shadow: rgba(10,6,2,.18);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  background: var(--paper);
+  color: var(--warm5);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Aged paper texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.038'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: .6;
+}
+
+/* === HEADER === */
+header {
+  background: var(--warm5);
+  color: var(--warm1);
+  padding: 2.4rem 1.5rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(184,76,40,.22) 0%, transparent 65%),
+              radial-gradient(ellipse 50% 40% at 0% 100%, rgba(26,79,140,.16) 0%, transparent 55%);
+  pointer-events: none;
+}
+/* Decorative corner marks */
+header::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(212,192,160,.15);
+  pointer-events: none;
+}
+
+.header-inner { position: relative; z-index: 1; }
+
+.header-ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: .9rem;
+}
+.ornament-line {
+  height: 1px;
+  width: 60px;
+  background: linear-gradient(90deg, transparent, rgba(212,192,160,.45));
+}
+.ornament-line.r { transform: scaleX(-1); }
+.ornament-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 10px var(--fire-glow);
+}
+
+h1 {
+  font-family: 'IM Fell English', Georgia, serif;
+  font-size: clamp(1.6rem, 5.5vw, 2.6rem);
+  font-weight: 400;
+  letter-spacing: .04em;
+  color: var(--warm0);
+  line-height: 1.1;
+}
+h1 em {
+  font-style: italic;
+  color: var(--warm2);
+}
+.subtitle {
+  margin-top: .5rem;
+  font-size: .67rem;
+  font-weight: 600;
+  letter-spacing: .26em;
+  text-transform: uppercase;
+  color: var(--warm3);
+}
+
+/* Element glyphs row */
+.elem-row {
+  display: flex;
+  justify-content: center;
+  gap: 1.6rem;
+  margin-top: 1.4rem;
+  margin-bottom: 1.8rem;
+}
+.elem-glyph {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  opacity: .65;
+  transition: opacity .2s;
+}
+.eg-fire   { border-color: var(--fire);  color: var(--fire);  }
+.eg-wood   { border-color: var(--wood);  color: var(--wood);  }
+.eg-earth  { border-color: var(--earth); color: var(--earth); }
+.eg-metal  { border-color: var(--metal); color: var(--metal); }
+.eg-water  { border-color: var(--water); color: var(--water); }
+
+/* Mode tabs */
+.mode-tabs {
+  display: inline-flex;
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 4px;
+  padding: 3px;
+  gap: 2px;
+}
+.mode-tab {
+  padding: .5rem 1.5rem;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  font-family: 'Outfit', sans-serif;
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--warm3);
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.mode-tab.active {
+  background: var(--acc);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(184,76,40,.40);
+}
+.mode-tab:not(.active):hover { color: var(--warm1); }
+
+/* === MAIN === */
+main {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 2.5rem 1.2rem 6rem;
+}
+
+.mode-panel { display: none; }
+.mode-panel.active { display: block; }
+
+/* Section label */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  margin-bottom: 1.4rem;
+  font-size: .63rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--warm3);
+}
+.section-label::before, .section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* === BODY DIAGRAM === */
+.body-diagram {
+  display: grid;
+  grid-template-columns: 1fr 32px 1fr;
+  grid-template-rows: auto auto;
+  grid-template-areas: "larm spine rarm" "lleg spine rleg";
+  gap: .8rem;
+  max-width: 600px;
+  margin: 0 auto 1.6rem;
+}
+
+.spine {
+  grid-area: spine;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 8px 0;
+}
+.spine-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--warm2);
+  flex-shrink: 0;
+  opacity: .5;
+}
+.spine-line {
+  flex: 1; width: 1px;
+  background: var(--border);
+  min-height: 5px;
+}
+
+.limb-block {
+  background: var(--warm0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .9rem .8rem;
+  box-shadow: 0 2px 10px var(--shadow), inset 0 1px 0 rgba(255,255,255,.7);
+  position: relative;
+}
+.limb-block::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 8px 8px 0 0;
+  background: var(--border2);
+}
+
+[data-limb="leftArm"]  { grid-area: larm; }
+[data-limb="rightArm"] { grid-area: rarm; }
+[data-limb="leftLeg"]  { grid-area: lleg; }
+[data-limb="rightLeg"] { grid-area: rleg; }
+
+.limb-title {
+  font-size: .59rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--warm3);
+  text-align: center;
+  margin-bottom: .65rem;
+  padding-bottom: .45rem;
+  border-bottom: 1px solid var(--border2);
+}
+.meridian-rows { display: flex; flex-direction: column; gap: 0; }
+.meridian-row { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; }
+.mer-divider { height: 1px; background: var(--border2); margin: .38rem 0; }
+
+/* Meridian buttons */
+.mer-btn {
+  position: relative;
+  padding: .52rem .15rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--warm1);
+  font-family: 'Outfit', sans-serif;
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--warm4);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.8);
+}
+.mer-btn:hover {
+  border-color: var(--warm3);
+  color: var(--warm5);
+  background: var(--warm0);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px var(--shadow);
+}
+.mer-btn:active { transform: translateY(0); }
+
+/* Closed (activated) states per element */
+.mer-btn.closed {
+  color: #fff;
+  font-weight: 700;
+  border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(0,0,0,.25);
+}
+/* Fire */
+.mer-btn[data-mer="PC"].closed,.mer-btn[data-mer="SJ"].closed,
+.mer-btn[data-mer="HT"].closed,.mer-btn[data-mer="SI"].closed {
+  background: var(--fire);
+  box-shadow: 0 3px 14px var(--fire-glow);
+}
+/* Wood */
+.mer-btn[data-mer="GB"].closed,.mer-btn[data-mer="LV"].closed {
+  background: var(--wood);
+  box-shadow: 0 3px 14px var(--wood-glow);
+}
+/* Metal */
+.mer-btn[data-mer="LU"].closed,.mer-btn[data-mer="LI"].closed {
+  background: linear-gradient(145deg, #7aaac8, #5888aa);
+  color: #fff;
+  box-shadow: 0 3px 14px var(--metal-glow);
+}
+/* Water */
+.mer-btn[data-mer="KD"].closed,.mer-btn[data-mer="BL"].closed {
+  background: var(--water);
+  box-shadow: 0 3px 14px var(--water-glow);
+}
+/* Earth */
+.mer-btn[data-mer="ST"].closed,.mer-btn[data-mer="SP"].closed {
+  background: var(--earth);
+  box-shadow: 0 3px 14px var(--earth-glow);
+}
+
+/* === ACTIONS === */
+.actions {
+  display: flex; gap: .8rem; justify-content: center;
+  margin-top: 1.5rem; flex-wrap: wrap;
+}
+.btn-primary {
+  font-family: 'Outfit', sans-serif;
+  font-size: .75rem; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  padding: .75rem 2.2rem;
+  background: var(--acc);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .2s;
+  box-shadow: 0 3px 16px rgba(184,76,40,.35), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.btn-primary:hover {
+  background: #c8542f;
+  box-shadow: 0 5px 22px rgba(184,76,40,.50);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); }
+.btn-secondary {
+  font-family: 'Outfit', sans-serif;
+  font-size: .75rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .75rem 1.5rem;
+  background: transparent;
+  color: var(--warm3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-secondary:hover { color: var(--warm5); border-color: var(--warm3); background: var(--warm1); }
+
+/* === RESULTS === */
+.results-area { margin-top: 2.2rem; }
+.results-summary {
+  text-align: center;
+  color: var(--warm4);
+  font-size: .85rem;
+  line-height: 1.9;
+  margin-bottom: 1.4rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border2);
+}
+.results-summary strong { color: var(--warm5); font-weight: 700; }
+.no-results { text-align: center; color: var(--warm3); padding: 3rem 1rem; font-size: .9rem; }
+
+/* Result card */
+.result-card {
+  background: var(--warm0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.1rem 1.3rem;
+  margin-bottom: .85rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform .18s, box-shadow .18s;
+  box-shadow: 0 2px 10px var(--shadow), inset 0 1px 0 rgba(255,255,255,.7);
+}
+.result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(10,6,2,.14);
+  border-color: var(--warm2);
+}
+/* Left accent stripe */
+.result-card::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 8px 0 0 8px;
+}
+.cat-8ers::after    { background: linear-gradient(180deg, var(--earth), rgba(212,146,10,.3)); }
+.cat-magic8::after  { background: linear-gradient(180deg, var(--wood),  rgba(58,184,106,.3)); }
+.cat-fire12::after  { background: linear-gradient(180deg, var(--fire),  rgba(232,68,42,.3));  }
+.cat-16ers::after   { background: linear-gradient(180deg, #9040e0, rgba(144,64,224,.3));      }
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin-bottom: .9rem;
+  flex-wrap: wrap;
+}
+.rank-badge {
+  font-family: 'IM Fell English', serif;
+  font-size: .85rem;
+  font-weight: 400;
+  font-style: italic;
+  min-width: 2rem;
+  color: var(--warm3);
+  flex-shrink: 0;
+}
+.rank-badge.r1 { color: var(--acc); }
+.rank-badge.r2 { color: var(--warm4); }
+.rank-badge.r3 { color: var(--earth); }
+
+.result-category {
+  font-size: .58rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  padding: .18rem .55rem;
+  border-radius: 3px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.cat-8ers   .result-category { color: var(--earth); border-color: rgba(212,146,10,.4); background: var(--earth-dim); }
+.cat-magic8 .result-category { color: var(--wood);  border-color: rgba(58,184,106,.4); background: var(--wood-dim);  }
+.cat-fire12 .result-category { color: var(--fire);  border-color: rgba(232,68,42,.4);  background: var(--fire-dim);  }
+.cat-16ers  .result-category { color: #9040e0;      border-color: rgba(144,64,224,.4); background: rgba(144,64,224,.08); }
+
+.result-points {
+  font-size: 1.1rem; font-weight: 700; font-family: 'IM Fell English', serif;
+  color: var(--warm5); letter-spacing: .02em;
+}
+.result-cell {
+  font-size: .73rem; color: var(--warm3);
+  flex: 1; min-width: 0;
+}
+.match-score {
+  font-size: .78rem; color: var(--warm3); white-space: nowrap; flex-shrink: 0;
+}
+.match-pct { font-size: .96rem; font-weight: 700; color: var(--acc2); }
+.match-detail { font-size: .73rem; opacity: .7; }
+
+.result-meridians {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .8rem;
+}
+.mer-group label {
+  display: block;
+  font-size: .58rem; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--warm3); margin-bottom: .35rem;
+}
+.mer-tags { display: flex; flex-wrap: wrap; gap: .28rem; }
+.mer-tag {
+  padding: .18rem .46rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--warm1);
+  font-size: .8rem; font-weight: 600;
+  color: var(--warm4); letter-spacing: .03em;
+}
+.mer-tag.matched { border-color: transparent; color: #fff; font-weight: 700; }
+/* Element colours for matched tags */
+.mer-tag.matched[data-m="PC"],.mer-tag.matched[data-m="SJ"],
+.mer-tag.matched[data-m="HT"],.mer-tag.matched[data-m="SI"]  { background: var(--fire);  box-shadow: 0 0 8px var(--fire-glow);  }
+.mer-tag.matched[data-m="GB"],.mer-tag.matched[data-m="LV"]  { background: var(--wood);  box-shadow: 0 0 8px var(--wood-glow);  }
+.mer-tag.matched[data-m="LU"],.mer-tag.matched[data-m="LI"]  { background: #5888aa;      box-shadow: 0 0 8px var(--metal-glow); }
+.mer-tag.matched[data-m="KD"],.mer-tag.matched[data-m="BL"]  { background: var(--water); box-shadow: 0 0 8px var(--water-glow); }
+.mer-tag.matched[data-m="ST"],.mer-tag.matched[data-m="SP"]  { background: var(--earth); box-shadow: 0 0 8px var(--earth-glow); }
+.mer-tag.bilateral { /* no special outline */ }
+
+/* === POINT LOOKUP === */
+.search-wrap {
+  max-width: 460px; margin: 0 auto 1.3rem; position: relative;
+}
+.search-wrap input {
+  width: 100%;
+  padding: .75rem 1.1rem .75rem 2.8rem;
+  background: var(--warm0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--warm5);
+  font-family: 'Outfit', sans-serif;
+  font-size: .95rem;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.06), 0 1px 0 rgba(255,255,255,.8);
+}
+.search-wrap input:focus {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px rgba(184,76,40,.12), inset 0 2px 5px rgba(0,0,0,.06);
+}
+.search-wrap input::placeholder { color: var(--warm2); }
+.search-icon {
+  position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+  color: var(--warm2); font-size: .9rem; pointer-events: none; line-height: 1;
+}
+
+.sides-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .7rem;
+  padding-top: .6rem;
+  border-top: 1px solid var(--border2);
+}
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.side-label {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--warm3);
+  padding-bottom: .3rem;
+  border-bottom: 1px solid var(--border2);
+}
+.side-pts {
+  font-family: 'IM Fell English', serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--warm5);
+}
+@media (max-width: 480px) {
+  .sides-grid { grid-template-columns: 1fr; }
+}
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: .4rem;
+}
+.point-pill {
+  padding: .45rem .2rem;
+  background: var(--warm0);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: 'Outfit', sans-serif;
+  font-size: .8rem; font-weight: 600;
+  color: var(--warm4);
+  cursor: pointer; text-align: center;
+  transition: all .15s;
+  letter-spacing: .02em;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.8);
+}
+.point-pill:hover {
+  border-color: var(--warm3); color: var(--warm5);
+  background: var(--warm1); transform: translateY(-1px);
+  box-shadow: 0 3px 8px var(--shadow);
+}
+.point-pill.selected {
+  background: var(--acc2);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(26,79,140,.35);
+}
+
+/* Divider between point grid and results */
+.point-divider {
+  height: 1px; background: var(--border);
+  margin: 1.4rem 0;
+}
+
+/* Animations */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.result-card {
+  animation: fadeSlideUp .25s ease both;
+}
+.result-card:nth-child(2) { animation-delay: .04s; }
+.result-card:nth-child(3) { animation-delay: .08s; }
+.result-card:nth-child(4) { animation-delay: .12s; }
+.result-card:nth-child(5) { animation-delay: .16s; }
+
+@media (max-width: 540px) {
+  .body-diagram { grid-template-columns: 1fr 24px 1fr; gap: .5rem; }
+  .result-meridians { grid-template-columns: 1fr; }
+  .result-points { font-size: .97rem; }
+  h1 { font-size: 1.5rem; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="header-ornament">
+      <div class="ornament-line"></div>
+      <div class="ornament-dot"></div>
+      <div class="ornament-line r"></div>
+    </div>
+    <h1>Meridian Point <em>Lookup</em></h1>
+    <p class="subtitle">Palpation · Branches Method · Point Reference</p>
+    <div class="elem-row">
+      <div class="elem-glyph eg-fire">火</div>
+      <div class="elem-glyph eg-wood">木</div>
+      <div class="elem-glyph eg-earth">土</div>
+      <div class="elem-glyph eg-metal">金</div>
+      <div class="elem-glyph eg-water">水</div>
+    </div>
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-palp">Palpation → Points</button>
+      <button class="mode-tab"        id="tab-pt">Point → Meridians</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ── PALPATION PANEL ── -->
+  <div id="panel-palpation" class="mode-panel active">
+    <div class="section-label">Select Closed Meridians</div>
+    <div class="body-diagram">
+
+      <div class="limb-block" data-limb="leftArm">
+        <div class="limb-title">Left Arm</div>
+        <div class="meridian-rows">
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="SP">SP</button>
+            <button class="mer-btn" data-mer="ST">ST</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="LV">LV</button>
+            <button class="mer-btn" data-mer="GB">GB</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="KD">KD</button>
+            <button class="mer-btn" data-mer="BL">BL</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="spine">
+        <div class="spine-dot"></div><div class="spine-line"></div>
+        <div class="spine-dot"></div><div class="spine-line"></div>
+        <div class="spine-dot"></div><div class="spine-line"></div>
+        <div class="spine-dot"></div><div class="spine-line"></div>
+        <div class="spine-dot"></div>
+      </div>
+
+      <div class="limb-block" data-limb="rightArm">
+        <div class="limb-title">Right Arm</div>
+        <div class="meridian-rows">
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="SP">SP</button>
+            <button class="mer-btn" data-mer="ST">ST</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="LV">LV</button>
+            <button class="mer-btn" data-mer="GB">GB</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="KD">KD</button>
+            <button class="mer-btn" data-mer="BL">BL</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="limb-block" data-limb="leftLeg">
+        <div class="limb-title">Left Leg</div>
+        <div class="meridian-rows">
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="LU">LU</button>
+            <button class="mer-btn" data-mer="LI">LI</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="PC">PC</button>
+            <button class="mer-btn" data-mer="SJ">SJ</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="HT">HT</button>
+            <button class="mer-btn" data-mer="SI">SI</button>
+          </div>
+        </div>
+      </div>
+
+      <div></div><!-- spine spacer row 2 -->
+
+      <div class="limb-block" data-limb="rightLeg">
+        <div class="limb-title">Right Leg</div>
+        <div class="meridian-rows">
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="LU">LU</button>
+            <button class="mer-btn" data-mer="LI">LI</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="PC">PC</button>
+            <button class="mer-btn" data-mer="SJ">SJ</button>
+          </div>
+          <div class="mer-divider"></div>
+          <div class="meridian-row">
+            <button class="mer-btn" data-mer="HT">HT</button>
+            <button class="mer-btn" data-mer="SI">SI</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /body-diagram -->
+
+    <div class="actions">
+      <button class="btn-primary"   id="btn-find">Find Matching Points</button>
+      <button class="btn-secondary" id="btn-clear">Clear All</button>
+    </div>
+
+    <div id="palpation-results" class="results-area" style="display:none"></div>
+  </div>
+
+  <!-- ── POINT PANEL ── -->
+  <div id="panel-point" class="mode-panel">
+    <div class="section-label">Select a Point</div>
+    <div class="search-wrap">
+      <span class="search-icon">⊕</span>
+      <input type="text" id="point-search" placeholder="Search e.g. LU 5 · KD 10 · GB 44 …">
+    </div>
+    <div id="point-grid" class="point-grid"></div>
+    <div id="point-results" class="results-area" style="display:none"></div>
+  </div>
+</main>
+
+<script>
+(function () {
+"use strict";
+
+/* ═══════════════════════════ DATA ═══════════════════════════ */
+var D = {
+  e: [
+    {c:1, lp:["LI 1","SJ 3","KD 10"], rp:["KD 1","SP 3","LI 11"], ip:["LU","PC","BL","GB"], co:["LU","HT","BL","ST"]},
+    {c:2, lp:["HT 9","LU 9","GB 34"], rp:["GB 44","BL 65","HT 3"], ip:["SJ","SI","SP","KD"], co:["SJ","LI","SP","LV"]},
+    {c:3, lp:["SI 1","LI 3","LV 8"],  rp:["LV 1","KD 3","SI 8"],  ip:["PC","HT","ST","BL"], co:["PC","LU","ST","GB"]},
+    {c:4, lp:["ST 45","GB 41","PC 3"],rp:["PC 9","HT 7","ST 36"], ip:["SI","SJ","LV","KD"], co:["SI","LI","LV","SP"]},
+    {c:5, lp:["SP 1","LV 3","SJ 10"], rp:["SJ 1","SI 3","SP 9"],  ip:["HT","PC","GB","BL"], co:["HT","LU","GB","ST"]},
+    {c:6, lp:["LU 11","PC 7","BL 40"],rp:["BL 67","ST 43","LU 5"],ip:["LI","SJ","KD","LV"], co:["LI","SI","KD","SP"]}
+  ],
+  m: [
+    {c:1,  pt:"LU 5",  ip:["LU","KD","SP","ST","LI","SI"], co:["PC","KD","LV","BL","LI","SJ"]},
+    {c:2,  pt:"LI 1",  ip:["SP","LU","PC","LI","BL","GB"], co:["KD","LU","HT","SJ","BL","ST"]},
+    {c:3,  pt:"ST 45", ip:["LU","LV","KD","ST","SI","SJ"], co:["PC","LV","SP","BL","SI","LI"]},
+    {c:4,  pt:"SP 9",  ip:["SP","HT","LU","LI","GB","ST"], co:["KD","HT","PC","SJ","GB","BL"]},
+    {c:5,  pt:"HT 3",  ip:["HT","SP","LV","BL","SJ","LI"], co:["LU","SP","KD","GB","SJ","SI"]},
+    {c:6,  pt:"SI 1",  ip:["KD","PC","HT","SI","ST","BL"], co:["LV","PC","LU","LI","ST","GB"]},
+    {c:7,  pt:"BL 67", ip:["HT","KD","SP","BL","LI","SI"], co:["LU","KD","LV","GB","LI","SJ"]},
+    {c:8,  pt:"KD 10", ip:["KD","LU","PC","SI","BL","GB"], co:["LV","LU","HT","LI","BL","ST"]},
+    {c:9,  pt:"PC 3",  ip:["PC","LV","KD","GB","SI","SJ"], co:["HT","LV","SP","ST","SI","LI"]},
+    {c:10, pt:"SJ 1",  ip:["LV","HT","LU","SJ","GB","ST"], co:["SP","HT","PC","SI","GB","BL"]},
+    {c:11, pt:"GB 44", ip:["PC","SP","LV","GB","SJ","LI"], co:["HT","SP","KD","ST","SJ","SI"]},
+    {c:12, pt:"LV 8",  ip:["LV","PC","HT","SJ","ST","BL"], co:["SP","PC","LU","SI","ST","GB"]}
+  ],
+  f: [
+    {c:1, pts:["LU 10","ST 41","HT 8","BL 60","PC 8","GB 38"], ip:["SP","LV","KD","LI","SJ","SI"], co:["SP","LV","KD","LI","SJ","SI"]},
+    {c:2, pts:["LI 5","SP 2","SI 5","KD 2","SJ 6","LV 2"],     ip:["LU","PC","HT","ST","GB","BL"], co:["LU","PC","HT","ST","GB","BL"]}
+  ],
+  s: [
+    {c:1, pts:["LU 8","ST 44"],  ip:["LU","SP","LV","KD","ST","LI","SJ","SI"], co:["PC","SP","LV","KD","BL","LI","SJ","SI"]},
+    {c:2, pts:["SP 5","LI 2"],   ip:["SP","LU","PC","HT","LI","ST","GB","BL"], co:["KD","LU","PC","HT","SJ","ST","GB","BL"]},
+    {c:3, pts:["HT 4","BL 66"],  ip:["HT","SP","LV","KD","BL","LI","SJ","SI"], co:["LU","SP","LV","KD","GB","LI","SJ","SI"]},
+    {c:4, pts:["KD 7","SI 2"],   ip:["KD","LU","PC","HT","SI","ST","GB","BL"], co:["LV","LU","PC","HT","LI","ST","GB","BL"]},
+    {c:5, pts:["PC 5","GB 43"],  ip:["PC","SP","LV","KD","GB","LI","SJ","SI"], co:["HT","SP","LV","KD","ST","LI","SJ","SI"]},
+    {c:6, pts:["LV 4","SJ 2"],   ip:["LV","LU","PC","HT","SJ","ST","GB","BL"], co:["SP","LU","PC","HT","SI","ST","GB","BL"]}
+  ]
+};
+
+var LIMBS = ["leftArm","rightArm","leftLeg","rightLeg"];
+var sel   = {leftArm:{}, rightArm:{}, leftLeg:{}, rightLeg:{}};
+var allPts = null;
+var selPt  = null;
+
+/* ── utils ── */
+function has(arr, v) { return arr.indexOf(v) !== -1; }
+function el(id)      { return document.getElementById(id); }
+
+function getUnion() {
+  var u = {};
+  for (var i = 0; i < LIMBS.length; i++) {
+    var ks = Object.keys(sel[LIMBS[i]]);
+    for (var j = 0; j < ks.length; j++) if (sel[LIMBS[i]][ks[j]]) u[ks[j]] = true;
+  }
+  return Object.keys(u);
+}
+// Returns meridians selected on left limbs only (not bilateral)
+function getLeftOnly() {
+  var u = {};
+  ["leftArm","leftLeg"].forEach(function(l){
+    Object.keys(sel[l]).forEach(function(m){ if (sel[l][m]) u[m] = true; });
+  });
+  // Remove bilaterals
+  ["rightArm","rightLeg"].forEach(function(l){
+    Object.keys(sel[l]).forEach(function(m){ if (sel[l][m]) delete u[m]; });
+  });
+  return Object.keys(u);
+}
+// Returns meridians selected on right limbs only (not bilateral)
+function getRightOnly() {
+  var u = {};
+  ["rightArm","rightLeg"].forEach(function(l){
+    Object.keys(sel[l]).forEach(function(m){ if (sel[l][m]) u[m] = true; });
+  });
+  // Remove bilaterals
+  ["leftArm","leftLeg"].forEach(function(l){
+    Object.keys(sel[l]).forEach(function(m){ if (sel[l][m]) delete u[m]; });
+  });
+  return Object.keys(u);
+}
+
+/* ── mode switch ── */
+function setMode(mode) {
+  if (mode === "palpation") {
+    el("panel-palpation").classList.add("active");
+    el("panel-point").classList.remove("active");
+    el("tab-palp").classList.add("active");
+    el("tab-pt").classList.remove("active");
+  } else {
+    el("panel-point").classList.add("active");
+    el("panel-palpation").classList.remove("active");
+    el("tab-pt").classList.add("active");
+    el("tab-palp").classList.remove("active");
+    buildGrid();
+  }
+}
+
+/* ── meridian toggle ── */
+function toggleMer(btn) {
+  var mer  = btn.getAttribute("data-mer");
+  var node = btn.parentNode;
+  while (node && !node.getAttribute("data-limb")) node = node.parentNode;
+  if (!node) return;
+  var limb = node.getAttribute("data-limb");
+  if (sel[limb][mer]) {
+    delete sel[limb][mer];
+    btn.classList.remove("closed");
+  } else {
+    sel[limb][mer] = true;
+    btn.classList.add("closed");
+  }
+}
+
+function clearAll() {
+  for (var i = 0; i < LIMBS.length; i++) sel[LIMBS[i]] = {};
+  document.querySelectorAll(".mer-btn.closed").forEach(function(b){ b.classList.remove("closed"); });
+  var a = el("palpation-results");
+  a.style.display = "none";
+  while (a.firstChild) a.removeChild(a.firstChild);
+}
+
+/* ── scoring ──
+   leftOnly/rightOnly = 1 slot each (closed one side).
+   bilateral = 2 slots (closed both sides; needs both sides opened to score fully).
+   Needle-side prescription:
+     ip list opens needle-side  → satisfies needleSideOnly + bilateral needle-side (+1 each)
+     co list opens opp-side     → satisfies oppSideOnly + bilateral opp-side (+1 each)
+*/
+function scoreNeedleSide(ip, co, needleSideOnly, oppSideOnly, bil) {
+  var opened = 0;
+  needleSideOnly.forEach(function(m){ if (has(ip, m)) opened++; });
+  oppSideOnly.forEach(function(m){    if (has(co, m)) opened++; });
+  bil.forEach(function(m){
+    if (has(ip, m)) opened++;
+    if (has(co, m)) opened++;
+  });
+  var total = needleSideOnly.length + oppSideOnly.length + bil.length * 2;
+  return { opened: opened, total: total,
+           pct: total > 0 ? Math.round(100 * opened / total) : 0 };
+}
+
+/* ── find points ── */
+function findPoints() {
+  var union = getUnion();
+  if (!union.length) { alert("Please select at least one closed meridian."); return; }
+
+  var leftOnly  = getLeftOnly();
+  var rightOnly = getRightOnly();
+  var bil       = [];
+  union.forEach(function(m){
+    if (!has(leftOnly, m) && !has(rightOnly, m)) bil.push(m);
+  });
+
+  var totalSlots = leftOnly.length + rightOnly.length + bil.length * 2;
+  var res = [];
+
+  function addResult(cat, cls, lpts, rpts, cell, ip, co) {
+    var sL = scoreNeedleSide(ip, co, leftOnly,  rightOnly, bil);
+    var sR = scoreNeedleSide(ip, co, rightOnly, leftOnly,  bil);
+    var best, pts, needleSideOnly, oppSideOnly;
+    if (sL.pct >= sR.pct) {
+      best = sL; pts = lpts; needleSideOnly = leftOnly;  oppSideOnly = rightOnly;
+    } else {
+      best = sR; pts = rpts; needleSideOnly = rightOnly; oppSideOnly = leftOnly;
+    }
+    if (best.pct > 0) {
+      res.push({ cat:cat, cls:cls, pts:pts, cell:cell, ip:ip, co:co,
+                 opened:best.opened, total:totalSlots, pct:best.pct,
+                 cellSize: ip.length + co.length,
+                 needleSideOnly:needleSideOnly, oppSideOnly:oppSideOnly, bil:bil });
+    }
+  }
+
+  D.e.forEach(function(x){
+    addResult("8ers","cat-8ers", x.lp.join(" / "), x.rp.join(" / "), "Cell "+x.c, x.ip, x.co);
+  });
+  D.m.forEach(function(x){
+    addResult("Magic 8ers","cat-magic8", x.pt, x.pt, "Cell "+x.c, x.ip, x.co);
+  });
+  D.f.forEach(function(x){
+    addResult("Fire 12ers","cat-fire12", x.pts.join(" / "), x.pts.join(" / "), "Cell "+x.c, x.ip, x.co);
+  });
+  D.s.forEach(function(x){
+    addResult("16ers","cat-16ers", x.pts.join(" / "), x.pts.join(" / "), "Cell "+x.c, x.ip, x.co);
+  });
+
+  res.sort(function(a, b) {
+    if (b.pct !== a.pct) return b.pct - a.pct;
+    return (b.opened / b.cellSize) - (a.opened / a.cellSize);
+  });
+
+  renderPalpResults(res, leftOnly, rightOnly, bil, totalSlots);
+}
+
+/* ── DOM helpers ── */
+function mkEl(tag, cls, txt) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+function mkTag(m, matched) {
+  var t = mkEl("span", "mer-tag" + (matched ? " matched" : ""), m);
+  t.setAttribute("data-m", m);
+  return t;
+}
+
+function ipMatch(m, ip, needleSideOnly, bil) {
+  if (!has(ip, m)) return false;
+  return has(needleSideOnly, m) || has(bil, m);
+}
+function coMatch(m, co, oppSideOnly, bil) {
+  if (!has(co, m)) return false;
+  return has(oppSideOnly, m) || has(bil, m);
+}
+
+/* ── render palpation results ── */
+function renderPalpResults(res, leftOnly, rightOnly, bil, totalSlots) {
+  var area = el("palpation-results");
+  area.style.display = "block";
+  while (area.firstChild) area.removeChild(area.firstChild);
+
+  if (!res.length) {
+    area.appendChild(mkEl("p","no-results","No matches found for the selected meridians."));
+    return;
+  }
+
+  // Summary line
+  var lnames = {leftArm:"L.Arm", rightArm:"R.Arm", leftLeg:"L.Leg", rightLeg:"R.Leg"};
+  var parts = [];
+  LIMBS.forEach(function(l){
+    var ms = Object.keys(sel[l]).filter(function(m){ return sel[l][m]; });
+    if (ms.length) parts.push(lnames[l] + ": " + ms.join(", "));
+  });
+  var details = [];
+  if (leftOnly.length)  details.push("Left only: "  + leftOnly.join(", "));
+  if (rightOnly.length) details.push("Right only: " + rightOnly.join(", "));
+  if (bil.length)       details.push("Bilateral: "  + bil.join(", "));
+  var sum = mkEl("p","results-summary");
+  sum.appendChild(mkEl("strong",null, parts.join("  /  ")));
+  sum.appendChild(document.createTextNode("\n"));
+  var small = mkEl("span",null, details.join("  ·  "));
+  small.style.fontSize = "0.73rem"; small.style.color = "var(--warm3)";
+  sum.appendChild(small);
+  sum.appendChild(document.createTextNode("\n" + res.length + " result" + (res.length!==1?"s":"") + " — ranked by best coverage"));
+  area.appendChild(sum);
+
+  var rankClasses = ["r1","r2","r3"];
+
+  res.forEach(function(r, i) {
+    var card = mkEl("div","result-card " + r.cls);
+
+    var hdr  = mkEl("div","result-header");
+    var rank = mkEl("span","rank-badge " + (rankClasses[i]||""), "#"+(i+1));
+    var cat  = mkEl("span","result-category", r.cat);
+    var pts  = mkEl("span","result-points",   r.pts);
+    var cel  = mkEl("span","result-cell",     r.cell);
+    var sc   = mkEl("span","match-score");
+    sc.appendChild(mkEl("span","match-pct", r.pct + "%"));
+    sc.appendChild(mkEl("span","match-detail", " (" + r.opened + "/" + r.total + ")"));
+    hdr.appendChild(rank); hdr.appendChild(cat); hdr.appendChild(pts);
+    hdr.appendChild(cel);  hdr.appendChild(sc);
+    card.appendChild(hdr);
+
+    var mers = mkEl("div","result-meridians");
+
+    var ig = mkEl("div","mer-group");
+    ig.appendChild(mkEl("label",null,"Ipsilateral"));
+    var it = mkEl("div","mer-tags");
+    r.ip.forEach(function(m){
+      it.appendChild(mkTag(m, ipMatch(m, r.ip, r.needleSideOnly, r.bil)));
+    });
+    ig.appendChild(it); mers.appendChild(ig);
+
+    var cg = mkEl("div","mer-group");
+    cg.appendChild(mkEl("label",null,"Contralateral"));
+    var ct = mkEl("div","mer-tags");
+    r.co.forEach(function(m){
+      ct.appendChild(mkTag(m, coMatch(m, r.co, r.oppSideOnly, r.bil)));
+    });
+    cg.appendChild(ct); mers.appendChild(cg);
+
+    card.appendChild(mers);
+    area.appendChild(card);
+  });
+
+  area.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+/* ── point lookup ── */
+function buildAllPts() {
+  var pts = [];
+  D.e.forEach(function(x){
+    x.lp.forEach(function(p){ pts.push({pt:p,cat:"8ers",    cls:"cat-8ers",  cell:"Cell "+x.c+" Left", ip:x.ip,co:x.co}); });
+    x.rp.forEach(function(p){ pts.push({pt:p,cat:"8ers",    cls:"cat-8ers",  cell:"Cell "+x.c+" Right",ip:x.co,co:x.ip}); });
+  });
+  D.m.forEach(function(x){ pts.push({pt:x.pt,cat:"Magic 8ers",cls:"cat-magic8",cell:"Cell "+x.c,ip:x.ip,co:x.co}); });
+  D.f.forEach(function(x){ x.pts.forEach(function(p){ pts.push({pt:p,cat:"Fire 12ers",cls:"cat-fire12",cell:"Cell "+x.c,ip:x.ip,co:x.co}); }); });
+  D.s.forEach(function(x){ x.pts.forEach(function(p){ pts.push({pt:p,cat:"16ers",    cls:"cat-16ers", cell:"Cell "+x.c,ip:x.ip,co:x.co}); }); });
+  return pts;
+}
+
+function buildGrid() {
+  if (!allPts) allPts = buildAllPts();
+  renderGrid(allPts);
+}
+
+function renderGrid(pts) {
+  var seen = {}, uniq = [];
+  pts.forEach(function(p){ if (!seen[p.pt]){ seen[p.pt]=true; uniq.push(p.pt); } });
+  uniq.sort(function(a,b){
+    var pa = a.match(/^([A-Z]+)\s*(\d+)/), pb = b.match(/^([A-Z]+)\s*(\d+)/);
+    if (!pa||!pb) return a < b ? -1 : 1;
+    if (pa[1] !== pb[1]) return pa[1] < pb[1] ? -1 : 1;
+    return parseInt(pa[2]) - parseInt(pb[2]);
+  });
+  var grid = el("point-grid");
+  while (grid.firstChild) grid.removeChild(grid.firstChild);
+  uniq.forEach(function(name){
+    var btn = mkEl("button","point-pill" + (selPt===name?" selected":""), name);
+    btn.setAttribute("data-pt", name);
+    grid.appendChild(btn);
+  });
+}
+
+function selectPoint(name) {
+  selPt = name;
+  document.querySelectorAll(".point-pill").forEach(function(p){
+    p.classList.toggle("selected", p.getAttribute("data-pt") === name);
+  });
+  if (!allPts) allPts = buildAllPts();
+  var matches = allPts.filter(function(p){ return p.pt === name; });
+  var area = el("point-results");
+  area.style.display = "block";
+  while (area.firstChild) area.removeChild(area.firstChild);
+
+  var sum = mkEl("p","results-summary");
+  sum.appendChild(mkEl("strong",null, name));
+  sum.appendChild(document.createTextNode(" — " + matches.length + " entr" + (matches.length===1?"y":"ies")));
+  area.appendChild(sum);
+
+  matches.forEach(function(r){
+    var card = mkEl("div","result-card " + r.cls);
+    var hdr  = mkEl("div","result-header");
+    hdr.appendChild(mkEl("span","result-category", r.cat));
+    hdr.appendChild(mkEl("span","result-points",   r.pt));
+    hdr.appendChild(mkEl("span","result-cell",     r.cell));
+    card.appendChild(hdr);
+
+    var mers = mkEl("div","result-meridians");
+    var ig = mkEl("div","mer-group"); ig.appendChild(mkEl("label",null,"Ipsilateral"));
+    var it = mkEl("div","mer-tags");
+    r.ip.forEach(function(m){ var t=mkEl("span","mer-tag",m); t.setAttribute("data-m",m); it.appendChild(t); });
+    ig.appendChild(it); mers.appendChild(ig);
+
+    var cg = mkEl("div","mer-group"); cg.appendChild(mkEl("label",null,"Contralateral"));
+    var ct = mkEl("div","mer-tags");
+    r.co.forEach(function(m){ var t=mkEl("span","mer-tag",m); t.setAttribute("data-m",m); ct.appendChild(t); });
+    cg.appendChild(ct); mers.appendChild(cg);
+
+    card.appendChild(mers);
+    area.appendChild(card);
+  });
+
+  area.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+/* ── event wiring ── */
+window.addEventListener("DOMContentLoaded", function() {
+  el("tab-palp").addEventListener("click", function(){ setMode("palpation"); });
+  el("tab-pt").addEventListener("click",   function(){ setMode("point");     });
+  el("btn-find").addEventListener("click",  findPoints);
+  el("btn-clear").addEventListener("click", clearAll);
+
+  document.querySelectorAll(".mer-btn").forEach(function(b){
+    b.addEventListener("click", function(){ toggleMer(this); });
+  });
+
+  el("point-search").addEventListener("input", function(){
+    if (!allPts) allPts = buildAllPts();
+    var q = this.value.trim().toLowerCase();
+    var filtered = q ? allPts.filter(function(p){ return p.pt.toLowerCase().indexOf(q) !== -1; }) : allPts;
+    renderGrid(filtered);
+    selPt = null;
+    el("point-results").style.display = "none";
+  });
+
+  el("point-grid").addEventListener("click", function(ev){
+    var btn = ev.target;
+    while (btn && btn !== this && !btn.classList.contains("point-pill")) btn = btn.parentNode;
+    if (btn && btn.classList.contains("point-pill")) selectPoint(btn.getAttribute("data-pt"));
+  });
+});
+
+})();
+</script>
+</body>
+</html>
