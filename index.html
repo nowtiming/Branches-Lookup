@@ -553,8 +553,28 @@ main {
 @media (max-width: 480px) {
   .sides-grid { grid-template-columns: 1fr; }
 }
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+.point-grid {
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+}
+.grid-cat-header {
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  padding: .22rem .55rem;
+  border-radius: 3px;
+  display: inline-block;
+  margin-bottom: .2rem;
+}
+.cat-8ers-header   { color: var(--earth); background: var(--earth-dim); border: 1px solid rgba(212,146,10,.3); }
+.cat-magic8-header { color: var(--wood);  background: var(--wood-dim);  border: 1px solid rgba(58,184,106,.3); }
+.cat-fire12-header { color: var(--fire);  background: var(--fire-dim);  border: 1px solid rgba(232,68,42,.3);  }
+.cat-16ers-header  { color: #9040e0;      background: rgba(144,64,224,.08); border: 1px solid rgba(144,64,224,.3); }
+.point-row {
+  display: flex;
+  flex-wrap: wrap;
   gap: .4rem;
 }
 .point-pill {
@@ -1062,20 +1082,44 @@ function buildGrid() {
 }
 
 function renderGrid(pts) {
-  var seen = {}, uniq = [];
-  pts.forEach(function(p){ if (!seen[p.pt]){ seen[p.pt]=true; uniq.push(p.pt); } });
-  uniq.sort(function(a,b){
-    var pa = a.match(/^([A-Z]+)\s*(\d+)/), pb = b.match(/^([A-Z]+)\s*(\d+)/);
-    if (!pa||!pb) return a < b ? -1 : 1;
-    if (pa[1] !== pb[1]) return pa[1] < pb[1] ? -1 : 1;
-    return parseInt(pa[2]) - parseInt(pb[2]);
-  });
   var grid = el("point-grid");
   while (grid.firstChild) grid.removeChild(grid.firstChild);
-  uniq.forEach(function(name){
-    var btn = mkEl("button","point-pill" + (selPt===name?" selected":""), name);
-    btn.setAttribute("data-pt", name);
-    grid.appendChild(btn);
+
+  // Group by category, preserving display order
+  var cats = [
+    { key:"8ers",       label:"8ers",        cls:"cat-8ers"   },
+    { key:"Magic 8ers", label:"Magic 8ers",  cls:"cat-magic8" },
+    { key:"Fire 12ers", label:"Fire 12ers",  cls:"cat-fire12" },
+    { key:"16ers",      label:"16ers",       cls:"cat-16ers"  }
+  ];
+
+  // When searching, filter pts but keep category grouping
+  cats.forEach(function(cat) {
+    var seen = {}, uniq = [];
+    pts.forEach(function(p){
+      if (p.cat === cat.key && !seen[p.pt]){ seen[p.pt]=true; uniq.push(p.pt); }
+    });
+    if (!uniq.length) return;
+
+    uniq.sort(function(a,b){
+      var pa = a.match(/^([A-Z]+)\s*(\d+)/), pb = b.match(/^([A-Z]+)\s*(\d+)/);
+      if (!pa||!pb) return a < b ? -1 : 1;
+      if (pa[1] !== pb[1]) return pa[1] < pb[1] ? -1 : 1;
+      return parseInt(pa[2]) - parseInt(pb[2]);
+    });
+
+    // Category header
+    var hdr = mkEl("div", "grid-cat-header " + cat.cls + "-header", cat.label);
+    grid.appendChild(hdr);
+
+    // Points row
+    var row = mkEl("div", "point-row");
+    uniq.forEach(function(name){
+      var btn = mkEl("button","point-pill " + cat.cls + (selPt===name?" selected":""), name);
+      btn.setAttribute("data-pt", name);
+      row.appendChild(btn);
+    });
+    grid.appendChild(row);
   });
 }
 
